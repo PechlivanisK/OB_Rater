@@ -1,0 +1,15 @@
+{
+  "name": "OB Recorder — CBTA Session Instrument",
+  "short_name": "OB Recorder",
+  "description": "Instructor-facing observable-behaviour recorder for CBTA/EBT sessions (EVAL track). Evidence assembly on the EASA ORCA cycle; grading remains an instructor judgement.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0D1320",
+  "theme_color": "#0D1320",
+  "icons": [
+    { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

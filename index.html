@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="OB Recorder">
+<meta name="theme-color" content="#0D1320">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>OB Recorder v0.2.1 — CBTA Session Instrument (EVAL track)</title>
+<style>
+/* ============ NIGHT-DECK TOKEN SYSTEM ============
+   Evaluative-track identity: deliberately NOT the Digital Hangar cream/teal.
+   Dark slate flight-deck ground; ECAM colour philosophy carries the meaning:
+   green = effective/normal, amber = ineffective/caution, cyan = information.
+   System fonts only — the tool must run fully offline in a sim bay. */
+:root{
+  --bg:#0D1320; --panel:#151D2E; --panel2:#1B2437; --line:#26314A; --line2:#31405E;
+  --ink:#E6ECF7; --mute:#8B99B5; --faint:#5A6A8A;
+  --grn:#4CC38A; --grnsoft:rgba(76,195,138,.13);
+  --amb:#E8A33D; --ambsoft:rgba(232,163,61,.13);
+  --cyn:#6FB7D9; --cynsoft:rgba(111,183,217,.12);
+  --red:#E06C5A;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px}
+button{touch-action:manipulation;font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:15px;color:var(--ink);background:var(--panel2);
+  border:1px solid var(--line2);border-radius:8px;padding:9px 11px;width:100%}
+textarea{min-height:64px;line-height:1.55}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--cyn);outline-offset:1px}
+.wrap{max-width:880px;margin:0 auto;padding:12px 12px 90px}
+#errbanner{display:none;position:fixed;top:0;left:0;right:0;z-index:99;background:#B3402A;color:#fff;
+  font:12px var(--mono);padding:7px 12px;line-height:1.5}
+
+/* header */
+header{padding:10px 2px 14px}
+.brand{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--cyn)}
+h1{font-size:21px;font-weight:700;margin:6px 0 4px;letter-spacing:.01em}
+.evaltag{display:inline-block;font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;color:var(--amb);
+  background:var(--ambsoft);border:1px solid #7A5A26;border-radius:6px;padding:3px 8px;margin-top:4px;line-height:1.55}
+.subnote{font-size:12px;color:var(--mute);line-height:1.6;margin-top:8px;max-width:640px}
+
+/* SIGNATURE: annunciator strip — nine competency lamps, evidence lights them up */
+.annunc{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:14px 0 6px}
+@media(min-width:620px){.annunc{grid-template-columns:repeat(9,1fr)}}
+.lamp{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:7px 4px 6px;text-align:center;min-height:52px}
+.lamp b{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--faint)}
+.lamp.lit b{color:var(--ink)}
+.lamp .ct{font-family:var(--mono);font-size:12px;margin-top:4px;color:var(--faint)}
+.lamp .ct .e{color:var(--grn)} .lamp .ct .i{color:var(--amb)}
+.lamp.lit{border-color:var(--line2);background:var(--panel2)}
+.lamp.hasineff{border-color:#7A5A26}
+
+/* mode tabs */
+.tabs{display:flex;gap:8px;margin:10px 0 16px}
+.tab{flex:1;font-family:var(--mono);font-size:11px;letter-spacing:.14em;padding:11px 4px;border-radius:9px;
+  border:1px solid var(--line2);background:var(--panel);color:var(--mute)}
+.tab.on{background:var(--cynsoft);border-color:var(--cyn);color:var(--cyn)}
+
+/* setup */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px;margin-bottom:12px}
+.card h2{font-size:13px;font-family:var(--mono);letter-spacing:.14em;color:var(--cyn);margin:0 0 12px;font-weight:600}
+.frow{margin-bottom:11px}
+.frow label{display:block;font-size:12px;color:var(--mute);margin-bottom:5px}
+.hint{font-size:11.5px;color:var(--faint);line-height:1.6;margin-top:4px}
+.privacy{font-size:12px;color:var(--mute);background:var(--cynsoft);border:1px solid #2C4A5C;border-radius:9px;
+  padding:9px 12px;line-height:1.65;margin-top:6px}
+.bigbtn{display:block;width:100%;padding:14px;border-radius:11px;border:1px solid var(--grn);
+  background:var(--grnsoft);color:var(--grn);font-size:15px;font-weight:600;margin-top:6px}
+.ghostbtn{display:block;width:100%;padding:12px;border-radius:11px;border:1px solid var(--line2);
+  background:transparent;color:var(--mute);font-size:13px;margin-top:9px}
+
+/* phase rail */
+.phaserail{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;-webkit-overflow-scrolling:touch}
+.pchip{flex:0 0 auto;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;padding:8px 12px;border-radius:20px;
+  border:1px solid var(--line2);background:var(--panel);color:var(--mute)}
+.pchip.on{background:var(--cynsoft);border-color:var(--cyn);color:var(--cyn)}
+
+/* competency sections + OB rows */
+.comp{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden}
+.comphead{display:flex;align-items:center;gap:10px;width:100%;background:transparent;border:0;
+  padding:13px 14px;text-align:left;color:var(--ink)}
+.comphead .code{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--cyn);min-width:38px}
+.comphead .name{flex:1;font-size:14.5px;font-weight:600}
+.comphead .mini{font-family:var(--mono);font-size:11px;color:var(--faint)}
+.comphead .mini .e{color:var(--grn)} .comphead .mini .i{color:var(--amb)}
+.comphead .caret{color:var(--faint);font-size:12px}
+.obrow{display:flex;align-items:stretch;gap:8px;padding:9px 12px;border-top:1px solid var(--line)}
+.obtxt{flex:1;min-width:0}
+.obtxt .oid{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;color:var(--faint);display:block;margin-bottom:2px}
+.obtxt .odesc{font-size:13px;line-height:1.5;color:var(--ink)}
+.obtally{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-top:3px}
+.obtally .e{color:var(--grn)} .obtally .i{color:var(--amb)}
+.tapE,.tapI{flex:0 0 52px;border-radius:9px;font-size:19px;font-weight:700;border:1px solid var(--line2);
+  background:var(--panel2);min-height:52px}
+.tapE{color:var(--grn)} .tapI{color:var(--amb)}
+.tapE:active{background:var(--grnsoft);border-color:var(--grn)}
+.tapI:active{background:var(--ambsoft);border-color:var(--amb)}
+
+/* live log strip */
+.logstrip{position:fixed;left:0;right:0;bottom:0;background:var(--panel2);border-top:1px solid var(--line2);
+  padding:9px 12px;z-index:60}
+.logstrip .inner{max-width:880px;margin:0 auto;display:flex;gap:9px;align-items:center}
+.lastev{flex:1;min-width:0;font-family:var(--mono);font-size:11px;color:var(--mute);line-height:1.5;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lastev .e{color:var(--grn)} .lastev .i{color:var(--amb)}
+.stripbtn{flex:0 0 auto;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;padding:9px 11px;
+  border-radius:8px;border:1px solid var(--line2);background:var(--panel);color:var(--mute)}
+.noterow{max-width:880px;margin:8px auto 0;display:none;gap:8px}
+.noterow.show{display:flex}
+
+/* summary */
+.sumcomp{border-top:1px solid var(--line);padding:13px 14px}
+.sumcomp:first-child{border-top:0}
+.sumhead{display:flex;align-items:baseline;gap:9px;margin-bottom:7px}
+.sumhead .code{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--cyn)}
+.sumhead .name{font-size:14.5px;font-weight:600;flex:1}
+.word{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0}
+.wcell{background:var(--panel2);border:1px solid var(--line2);border-radius:9px;padding:8px;text-align:center}
+.wcell b{display:block;font-size:17px;font-family:var(--mono)}
+.wcell span{font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;color:var(--faint);display:block;margin-top:3px;line-height:1.5}
+.wcell.wm b{color:var(--grn)} .wcell.wo b{color:var(--cyn)} .wcell.ww b{color:var(--amb)}
+.ineffline{font-size:12px;color:var(--amb);background:var(--ambsoft);border-left:3px solid var(--amb);
+  border-radius:0 8px 8px 0;padding:7px 10px;margin:6px 0;line-height:1.6}
+.effline{font-size:12px;color:var(--mute);line-height:1.6;margin:5px 0}
+.gradegrid{display:flex;gap:6px;margin:9px 0 6px}
+.gbtn{flex:1;padding:10px 2px;border-radius:8px;border:1px solid var(--line2);background:var(--panel2);
+  color:var(--mute);font-family:var(--mono);font-size:13px}
+.gbtn.on{background:var(--cynsoft);border-color:var(--cyn);color:var(--cyn);font-weight:700}
+.gradenote{font-size:11px;color:var(--faint);line-height:1.6;margin-bottom:6px}
+.exportbtns{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px}
+.exportbtns button{padding:13px 6px;border-radius:10px;border:1px solid var(--line2);background:var(--panel2);
+  color:var(--ink);font-size:13px;font-weight:600}
+.copied{border-color:var(--grn)!important;color:var(--grn)!important}
+footer{font-family:var(--mono);font-size:9.5px;color:var(--faint);line-height:1.8;padding:22px 4px 10px}
+#bootbadge{position:fixed;bottom:8px;right:10px;z-index:98;font:10px var(--mono);color:var(--cyn);
+  background:var(--cynsoft);border:1px solid #2C4A5C;border-radius:6px;padding:2px 7px;opacity:.9}
+@media(prefers-reduced-motion:no-preference){.tapE:active,.tapI:active{transition:background .08s}}
+</style>
+</head>
+<body>
+<div id="errbanner"></div>
+<div class="wrap">
+<header>
+  <div class="brand">EVAL TRACK · CBTA SESSION INSTRUMENT</div>
+  <h1>OB Recorder <span style="font-family:var(--mono);font-size:13px;color:var(--faint)">v0.1</span></h1>
+  <div class="evaltag">EVALUATIVE INSTRUMENT — instructor / examiner use only. Architecturally separate from The Left Seat companion and the Digital Hangar (developmental / SBT track). Never present to trainees as a self-assessment or mentoring tool.</div>
+  <div class="subnote">Built on the EASA ORCA cycle — <b>Observe · Record · Classify · Assess</b>. Tapping an OB performs Record and Classify in one action; the instrument then counts evidence on the three grading dimensions — <b>how many</b> distinct OBs, <b>how often</b> demonstrated, <b>how well</b> (effect on safety of the TEM outcome) — and assembles a debrief pack. Assess stays with the instructor: the instrument never assigns a grade.</div>
+  <div class="annunc" id="annunc"></div>
+</header>
+
+<div class="tabs" id="tabs"></div>
+<div id="view"></div>
+
+<footer>OB catalogue: ICAO nine-competency framework (PANS-TRG / Doc 9995 lineage; IATA CAE for Pilots, Instructors &amp; Evaluators GM) — verify wording and numbering against the operator's OM-D before formal use · workflow per the EASA ORCA methodology (Observe &middot; Record &middot; Classify &middot; Assess) &middot; grading dimensions per the IATA/EASA competency assessment guidance (OB count, frequency, effect on safety of the TEM outcome) · all data stays on this device (localStorage); use trainee codes, not names · EVAL-track artifact: not part of, and not to be cross-referenced from, the developmental companion ecosystem · HFHorizons / TUC · Pechlivanis K.</footer>
+</div>
+
+<script>
+window.onerror=function(msg,src,line,col){try{var b=document.getElementById("errbanner");b.style.display="block";b.textContent="SCRIPT ERROR - "+msg+" @ "+line+":"+col+" (screenshot this banner)";}catch(_){}return false;};
+window.addEventListener("unhandledrejection",function(ev){try{var b=document.getElementById("errbanner");b.style.display="block";b.textContent="ASYNC ERROR - "+(((ev||{}).reason||{}).message||"promise rejected");}catch(_){}});
+
+/* ============ CATALOGUE: ICAO nine competencies × observable behaviours ============ */
+const PHASES=["Brief","Pre-flt","Taxi","T/O","Climb","Cruise","Descent","App","Land","Abnormal","Debrief"];
+const CATALOGUE=[
+{code:"KNO",name:"Application of Knowledge",obs:[
+ "Demonstrates practical and applicable knowledge of limitations, systems and their interaction",
+ "Demonstrates required knowledge of published operating instructions",
+ "Demonstrates knowledge of the physical and air-traffic environment (routings, weather, airports, infrastructure)",
+ "Demonstrates appropriate knowledge of applicable legislation",
+ "Knows where to source required information",
+ "Demonstrates a positive interest in acquiring knowledge",
+ "Applies knowledge effectively"]},
+{code:"PRO",name:"Application of Procedures & Regulations",obs:[
+ "Identifies where to find procedures and regulations",
+ "Applies relevant operating instructions, procedures and techniques in a timely manner",
+ "Follows SOPs unless a higher degree of safety dictates an appropriate deviation",
+ "Operates aircraft systems and associated equipment correctly",
+ "Monitors aircraft systems status",
+ "Complies with applicable regulations",
+ "Applies relevant procedural knowledge"]},
+{code:"COM",name:"Communication",obs:[
+ "Determines that the recipient is ready and able to receive information",
+ "Selects appropriately what, when, how and with whom to communicate",
+ "Conveys messages clearly, accurately and concisely",
+ "Confirms that the recipient demonstrates understanding of important information",
+ "Listens actively and demonstrates understanding when receiving information",
+ "Asks relevant and effective questions",
+ "Uses appropriate escalation to resolve identified deviations",
+ "Uses and interprets non-verbal communication appropriately",
+ "Adheres to standard radiotelephony phraseology and procedures",
+ "Reads, interprets, constructs and responds to datalink messages accurately"]},
+{code:"FPA",name:"Flight Path Management — Automation",obs:[
+ "Uses appropriate flight management, guidance systems and automation as installed and applicable",
+ "Monitors and detects deviations from the intended flight path and takes appropriate action",
+ "Manages the flight path to achieve optimum operational performance",
+ "Maintains the intended flight path using automation whilst managing other tasks and distractions",
+ "Selects the level and mode of automation in a timely manner, considering phase of flight and workload",
+ "Effectively monitors automation, including engagement and automatic mode transitions"]},
+{code:"FPM",name:"Flight Path Management — Manual",obs:[
+ "Controls the aircraft manually with accuracy and smoothness appropriate to the situation",
+ "Monitors and detects deviations from the intended flight path and takes appropriate action",
+ "Controls the aircraft using the relationship between attitude, speed and thrust, and navigation or visual cues",
+ "Manages the flight path to achieve optimum operational performance",
+ "Maintains the intended flight path during manual flight whilst managing other tasks and distractions",
+ "Uses flight management and guidance systems appropriately during manual flight",
+ "Effectively monitors flight guidance systems, including engagement and mode transitions"]},
+{code:"LTW",name:"Leadership & Teamwork",obs:[
+ "Encourages team participation and open communication",
+ "Demonstrates initiative and provides direction when required",
+ "Engages others in planning",
+ "Considers inputs from others",
+ "Gives and receives feedback constructively",
+ "Addresses and resolves conflicts and disagreements constructively",
+ "Exercises decisive leadership when required",
+ "Accepts responsibility for decisions and actions",
+ "Carries out instructions when directed",
+ "Applies effective intervention strategies to resolve identified deviations",
+ "Manages cultural and language challenges as applicable"]},
+{code:"PSD",name:"Problem Solving & Decision Making",obs:[
+ "Identifies, assesses and manages threats and errors in a timely manner",
+ "Seeks accurate and adequate information from appropriate sources",
+ "Identifies and verifies what has gone wrong, and why, when appropriate",
+ "Perseveres in working through problems whilst prioritising safety",
+ "Identifies and considers appropriate options",
+ "Applies appropriate and timely decision-making techniques",
+ "Monitors, reviews and adapts decisions as required",
+ "Adapts to situations where no guidance or procedure exists",
+ "Demonstrates resilience when encountering an unexpected event"]},
+{code:"SAW",name:"Situation Awareness & Information Mgmt",obs:[
+ "Monitors and assesses the state of the aircraft and its systems",
+ "Monitors and assesses the aircraft's energy state and anticipated flight path",
+ "Monitors and assesses the general environment as it may affect the operation",
+ "Validates the accuracy of information and checks for gross errors",
+ "Maintains awareness of the people involved in the operation and their capacity to perform",
+ "Develops effective contingency plans based on potential risks from threats and errors",
+ "Responds to indications of reduced situation awareness"]},
+{code:"WLM",name:"Workload Management",obs:[
+ "Exercises self-control in all situations",
+ "Plans, prioritises and schedules tasks effectively",
+ "Manages time efficiently when carrying out tasks",
+ "Offers and gives assistance",
+ "Delegates tasks",
+ "Seeks and accepts assistance when appropriate",
+ "Monitors, reviews and cross-checks actions conscientiously",
+ "Verifies that tasks are completed to the expected outcome",
+ "Manages and recovers from interruptions, distractions, variations and failures effectively"]}
+];
+CATALOGUE.forEach((c,ci)=>{c.i=ci;c.obIds=c.obs.map((_,oi)=>c.code+" "+(ci+1)+"."+(oi+1));});
+
+/* ============ STATE + STORE ============ */
+const store={
+  get(k){try{const v=localStorage.getItem("obr-"+k);return v?JSON.parse(v):null}catch(_){return null}},
+  set(k,v){try{localStorage.setItem("obr-"+k,JSON.stringify(v))}catch(_){}},
+  del(k){try{localStorage.removeItem("obr-"+k)}catch(_){}}
+};
+function blank(){return{mode:"setup",meta:{trainee:"",session:"",scenario:"",instructor:"",date:new Date().toISOString().slice(0,10)},
+  phase:"Brief",log:[],grades:{},temNotes:{},sessionNote:"",collapsed:{},noteOpen:false,scale:"1-5"};}
+let S=store.get("session")||blank();
+function save(){store.set("session",S);}
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const hhmm=t=>{const d=new Date(t);return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2)};
+
+/* ============ DERIVED WORD EVIDENCE ============ */
+function evidence(){
+  const by={};
+  CATALOGUE.forEach(c=>by[c.code]={eff:0,ineff:0,distinct:new Set(),events:[],obTally:{}});
+  S.log.forEach(ev=>{
+    const b=by[ev.comp]; if(!b)return;
+    b.events.push(ev);
+    b.obTally[ev.ob]=b.obTally[ev.ob]||{e:0,i:0};
+    if(ev.eff){b.eff++;b.distinct.add(ev.ob);b.obTally[ev.ob].e++;}
+    else{b.ineff++;b.obTally[ev.ob].i++;}
+  });
+  return by;
+}
+
+/* ============ RENDER ============ */
+function render(){
+  save();
+  renderAnnunc();renderTabs();
+  const v=document.getElementById("view");
+  if(S.mode==="setup")v.innerHTML=setupHTML();
+  else if(S.mode==="live")v.innerHTML=liveHTML();
+  else v.innerHTML=summaryHTML();
+  wire();
+}
+function renderAnnunc(){
+  const by=evidence();
+  document.getElementById("annunc").innerHTML=CATALOGUE.map(c=>{
+    const b=by[c.code],lit=b.eff+b.ineff>0;
+    return '<div class="lamp'+(lit?" lit":"")+(b.ineff>0?" hasineff":"")+'"><b>'+c.code+'</b><div class="ct">'
+      +(lit?('<span class="e">'+b.eff+'&#10003;</span> <span class="i">'+b.ineff+'&#10007;</span>'):"&mdash;")+'</div></div>';
+  }).join("");
+}
+function renderTabs(){
+  const t=[["setup","SET-UP"],["live","OBSERVE &middot; RECORD"],["summary","ASSESS"]];
+  document.getElementById("tabs").innerHTML=t.map(x=>
+    '<button class="tab'+(S.mode===x[0]?" on":"")+'" data-mode="'+x[0]+'">'+x[1]+'</button>').join("");
+}
+
+/* ---- setup ---- */
+function setupHTML(){
+  const m=S.meta;
+  return '<div class="card"><h2>SESSION DETAILS</h2>'
+  +'<div class="frow"><label>Trainee code (not a name)</label><input id="f-trainee" value="'+esc(m.trainee)+'" autocomplete="off" placeholder="e.g. TR-07"></div>'
+  +'<div class="frow"><label>Session type</label><input id="f-session" value="'+esc(m.session)+'" placeholder="e.g. EBT module 2 / OPC / LOE / line training sector"></div>'
+  +'<div class="frow"><label>Scenario / lesson</label><input id="f-scenario" value="'+esc(m.scenario)+'" placeholder="e.g. LOFT: wx diversion + hyd fault"></div>'
+  +'<div class="frow"><label>Instructor initials</label><input id="f-instructor" value="'+esc(m.instructor)+'" autocomplete="off"></div>'
+  +'<div class="frow"><label>Date</label><input id="f-date" type="date" value="'+esc(m.date)+'"></div>'
+  +'<div class="privacy">Data protection: everything stays in this browser on this device. Use pseudonymous trainee codes; transcribe into the operator record system per your OM-D, then clear the session. Nothing is transmitted.</div>'
+  +'<button class="bigbtn" id="startbtn">'+(S.log.length?"Resume observation":"Begin observation")+'</button>'
+  +(S.log.length?(S.clearArm
+      ?'<button class="ghostbtn" id="clearbtn" style="border-color:var(--red);color:var(--red)">Tap again to permanently clear ('+S.log.length+' events)</button>'
+      :'<button class="ghostbtn" id="clearbtn">Clear session and start new (permanent)</button>'):"")
+  +'</div>';
+}
+
+/* ---- live ---- */
+function liveHTML(){
+  const by=evidence();
+  let h='<div class="phaserail">'+PHASES.map(p=>'<button class="pchip'+(S.phase===p?" on":"")+'" data-phase="'+p+'">'+p+'</button>').join("")+'</div>';
+  h+=CATALOGUE.map(c=>{
+    const b=by[c.code],col=S.collapsed[c.code];
+    let rows="";
+    if(!col)rows=c.obs.map((ob,oi)=>{
+      const id=c.obIds[oi],t=b.obTally[id]||{e:0,i:0};
+      return '<div class="obrow"><div class="obtxt"><span class="oid">'+id+'</span><span class="odesc">'+esc(ob)+'</span>'
+        +((t.e||t.i)?('<div class="obtally"><span class="e">'+t.e+'&#10003;</span> <span class="i">'+t.i+'&#10007;</span></div>'):"")
+        +'</div><button class="tapE" data-tap="e" data-comp="'+c.code+'" data-ob="'+id+'" aria-label="Effective '+id+'">&#10003;</button>'
+        +'<button class="tapI" data-tap="i" data-comp="'+c.code+'" data-ob="'+id+'" aria-label="Ineffective '+id+'">&#10007;</button></div>';
+    }).join("");
+    return '<div class="comp"><button class="comphead" data-coll="'+c.code+'"><span class="code">'+c.code+'</span>'
+      +'<span class="name">'+esc(c.name)+'</span><span class="mini">'
+      +((b.eff||b.ineff)?('<span class="e">'+b.eff+'&#10003;</span> <span class="i">'+b.ineff+'&#10007;</span>'):"&mdash;")
+      +'</span><span class="caret">'+(col?"&#9656;":"&#9662;")+'</span></button>'+rows+'</div>';
+  }).join("");
+  const last=S.log[S.log.length-1];
+  h+='<div class="logstrip"><div class="inner"><div class="lastev">'
+    +(last?('<span class="'+(last.eff?"e":"i")+'">'+(last.eff?"&#10003;":"&#10007;")+'</span> '+esc(last.ob)+' &middot; '+esc(last.phase)+' &middot; '+hhmm(last.t)+(last.note?" &middot; &ldquo;"+esc(last.note)+"&rdquo;":"")):"No events yet &mdash; tap &#10003; or &#10007; on an OB")
+    +'</div>'
+    +(last?'<button class="stripbtn" id="notebtn">+ NOTE</button><button class="stripbtn" id="undobtn">UNDO</button>':"")
+    +'</div>'
+    +'<div class="noterow'+(S.noteOpen?" show":"")+'"><input id="noteinput" placeholder="Short note on last event (e.g. late brief before TOD)" autocomplete="off"><button class="stripbtn" id="notesave">SAVE</button></div>'
+    +'</div>';
+  return h;
+}
+
+/* ---- summary ---- */
+function gradeLabels(){return["1","2","3","4","5"];}
+function summaryHTML(){
+  const by=evidence();
+  let h='<div class="card"><h2>WORD EVIDENCE &middot; PER COMPETENCY</h2>'
+  +'<div class="gradenote">ORCA: Observe and Record/Classify are complete; this screen is the Assess step, and it is yours. Evidence only, never a verdict: <b>how many</b> = distinct OBs demonstrated effectively (of those defined) &middot; <b>how often</b> = total effective demonstrations &middot; <b>how well</b> = effect on safety, resolved from the ineffective observations as a TEM outcome. The grade buttons record <i>your</i> judgement on the operator scale; the instrument proposes nothing.</div>';
+  h+=CATALOGUE.map(c=>{
+    const b=by[c.code];
+    if(b.eff+b.ineff===0)return '<div class="sumcomp"><div class="sumhead"><span class="code">'+c.code+'</span><span class="name">'+esc(c.name)+'</span></div><div class="effline">Not observed this session.</div>'+gradeRow(c.code)+'</div>';
+    const distinct=b.distinct.size,total=c.obs.length;
+    const ineffLines=b.events.filter(e=>!e.eff).map(e=>esc(e.ob)+" &middot; "+esc(e.phase)+" "+hhmm(e.t)+(e.note?" &mdash; "+esc(e.note):"")).join("<br>");
+    const effObs=[...b.distinct].join(", ");
+    return '<div class="sumcomp"><div class="sumhead"><span class="code">'+c.code+'</span><span class="name">'+esc(c.name)+'</span></div>'
+      +'<div class="word"><div class="wcell wm"><b>'+distinct+'/'+total+'</b><span>HOW MANY<br>distinct OBs eff.</span></div>'
+      +'<div class="wcell wo"><b>'+b.eff+'</b><span>HOW OFTEN<br>eff. demonstrations</span></div>'
+      +'<div class="wcell ww"><b>'+b.ineff+'</b><span>HOW WELL<br>effect on safety &middot; ineff.</span></div></div>'
+      +(effObs?'<div class="effline">Effective: '+effObs+'</div>':"")
+      +(ineffLines?'<div class="ineffline">'+ineffLines+'</div>':"")
+      +'<div class="frow"><label>Effect on safety — TEM outcome ('+c.code+')</label><textarea data-tem="'+c.code+'" placeholder="What was the effect on safety? Did the behaviours lead to effective threat and error management for this competency?">'+esc(S.temNotes[c.code]||"")+'</textarea></div>'
+      +gradeRow(c.code)+'</div>';
+  }).join("");
+  h+='</div><div class="card"><h2>SESSION NOTES &amp; EXPORT</h2>'
+  +'<div class="frow"><label>Overall session note</label><textarea id="sessnote">'+esc(S.sessionNote)+'</textarea></div>'
+  +'<div class="exportbtns">'
+  +'<button id="exp-debrief">Copy debrief pack</button>'
+  +'<button id="exp-claude">Copy Claude prompt</button>'
+  +'<button id="exp-json">Download JSON log</button>'
+  +'<button id="exp-csv">Download CSV log</button></div>'
+  +'<div class="hint" style="margin-top:9px">The Claude prompt embeds the full event log with instructions to compute the WORD table, draft a behaviour-anchored narrative debrief and propose facilitative debrief questions &mdash; while leaving all grading to you. Paste it into a Claude chat after the session.</div>'
+  +'</div>';
+  return h;
+}
+function gradeRow(code){
+  const g=S.grades[code];
+  return '<div class="gradegrid">'+gradeLabels().map(l=>'<button class="gbtn'+(g===l?" on":"")+'" data-grade="'+code+'" data-val="'+l+'">'+l+'</button>').join("")
+    +'<button class="gbtn'+(g==="NA"?" on":"")+'" data-grade="'+code+'" data-val="NA">N/A</button></div>';
+}
+
+/* ============ EXPORT BUILDERS ============ */
+function debriefText(){
+  const by=evidence(),m=S.meta;
+  let t="CBTA SESSION DEBRIEF PACK (instrument: OB Recorder v0.1 — evidence log; grades are instructor judgements)\n";
+  t+="Trainee: "+m.trainee+" · Session: "+m.session+" · Scenario: "+m.scenario+" · Instructor: "+m.instructor+" · Date: "+m.date+"\n\n";
+  CATALOGUE.forEach(c=>{
+    const b=by[c.code];
+    t+="["+c.code+"] "+c.name+"\n";
+    if(b.eff+b.ineff===0){t+="  Not observed this session.";}
+    else{
+      t+="  How many: "+b.distinct.size+"/"+c.obs.length+" distinct OBs effective · How often: "+b.eff+" effective demonstrations · How well (effect on safety): "+b.ineff+" ineffective observations\n";
+      b.events.forEach(e=>{t+="   "+(e.eff?"✓":"✗")+" "+e.ob+" · "+e.phase+" "+hhmm(e.t)+(e.note?" — "+e.note:"")+"\n";});
+      if(S.temNotes[c.code])t+="  Effect on safety / TEM outcome: "+S.temNotes[c.code]+"\n";
+    }
+    t+="\n  Instructor grade: "+(S.grades[c.code]||"not recorded")+"\n\n";
+  });
+  if(S.sessionNote)t+="Overall session note: "+S.sessionNote+"\n";
+  return t;
+}
+function claudePrompt(){
+  return "You are assisting a type-rating instructor after a CBTA/EBT session. Below is a time-stamped observable-behaviour (OB) log using the ICAO nine-competency framework. Each event is one OB observation marked effective (✓) or ineffective (✗), with flight phase and optional note.\n\n"
+  +"Please: (1) for each competency, restate the three grading dimensions from the log — how many distinct OBs were demonstrated effectively, how often effective demonstrations occurred, and how well — the effect on safety of the TEM outcome, drawing on the ineffective observations and the effect-on-safety notes; (2) write a concise behaviour-anchored narrative debrief per competency, evidence-first, naming the specific OBs and phases; (3) propose two or three facilitative, open debrief questions for the weakest evidence areas; (4) suggest, where the log shows a pattern, one root-cause hypothesis per underperforming competency for the instructor to test in the debrief conversation. Frame the whole output within the ORCA cycle (Observe-Record-Classify-Assess): your text supports Assess but does not perform it. Do NOT assign or suggest numeric grades — grading is the instructor's judgement alone. British spelling.\n\n"
+  +"=== SESSION LOG ===\n"+debriefText();
+}
+function csvText(){
+  let t="time,competency,ob_id,effective,phase,note\n";
+  S.log.forEach(e=>{t+=[new Date(e.t).toISOString(),e.comp,'"'+e.ob+'"',e.eff?"Y":"N",e.phase,'"'+String(e.note||"").replace(/"/g,'""')+'"'].join(",")+"\n";});
+  return t;
+}
+function copyText(txt,btn){
+  const done=()=>{if(btn){btn.classList.add("copied");const o=btn.textContent;btn.textContent="Copied ✓";setTimeout(()=>{btn.classList.remove("copied");btn.textContent=o;},1600);}};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(done).catch(()=>fallbackCopy(txt,done));}
+  else fallbackCopy(txt,done);
+}
+function fallbackCopy(txt,done){
+  try{const ta=document.createElement("textarea");ta.value=txt;ta.style.cssText="position:fixed;opacity:0";document.body.appendChild(ta);ta.focus();ta.select();document.execCommand("copy");document.body.removeChild(ta);done();}
+  catch(_){alert("Copy failed — select and copy the JSON download instead.");}
+}
+function download(name,txt,mime){
+  try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:mime||"text/plain"}));a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);}
+  catch(e){alert("Download failed: "+e.message);}
+}
+
+/* ============ WIRING (delegated — one listener, no per-node handlers) ============ */
+function wire(){
+  const v=document.getElementById("view");
+  v.onclick=function(ev){
+    const el=ev.target.closest("button,textarea");
+    if(!el)return;
+    if(el.dataset.tap){
+      S.log.push({comp:el.dataset.comp,ob:el.dataset.ob,eff:el.dataset.tap==="e",phase:S.phase,t:Date.now(),note:""});
+      S.noteOpen=false;render();return;
+    }
+    if(el.dataset.phase!==undefined){S.phase=el.dataset.phase;render();return;}
+    if(el.dataset.coll){S.collapsed[el.dataset.coll]=!S.collapsed[el.dataset.coll];render();return;}
+    if(el.dataset.grade){const c=el.dataset.grade,val=el.dataset.val;S.grades[c]=(S.grades[c]===val?undefined:val);render();return;}
+    if(el.id==="undobtn"){S.log.pop();S.noteOpen=false;render();return;}
+    if(el.id==="notebtn"){S.noteOpen=!S.noteOpen;render();if(S.noteOpen){const n=document.getElementById("noteinput");if(n)n.focus();}return;}
+    if(el.id==="notesave"){const n=document.getElementById("noteinput");if(n&&S.log.length){S.log[S.log.length-1].note=n.value.trim();}S.noteOpen=false;render();return;}
+    if(el.id==="startbtn"){readMeta();S.mode="live";render();return;}
+    if(el.id==="clearbtn"){
+      if(S.clearArm){S=blank();store.del("session");render();}
+      else{S.clearArm=true;render();
+        setTimeout(()=>{if(S.clearArm){S.clearArm=false;if(S.mode==="setup")render();}},5000);}
+      return;}
+    if(el.id==="exp-debrief"){copyText(debriefText(),el);return;}
+    if(el.id==="exp-claude"){copyText(claudePrompt(),el);return;}
+    if(el.id==="exp-json"){download("ob_session_"+S.meta.date+"_"+(S.meta.trainee||"anon")+".json",JSON.stringify({meta:S.meta,log:S.log,grades:S.grades,temNotes:S.temNotes,sessionNote:S.sessionNote,instrument:"OB Recorder v0.1"},null,2),"application/json");return;}
+    if(el.id==="exp-csv"){download("ob_session_"+S.meta.date+"_"+(S.meta.trainee||"anon")+".csv",csvText(),"text/csv");return;}
+  };
+  v.onchange=function(ev){
+    const el=ev.target;
+    if(el.dataset&&el.dataset.tem){S.temNotes[el.dataset.tem]=el.value;save();renderAnnunc();return;}
+    if(el.id==="sessnote"){S.sessionNote=el.value;save();return;}
+    if(el.id&&el.id.slice(0,2)==="f-"){readMeta();save();return;}
+  };
+  document.getElementById("tabs").onclick=function(ev){
+    const b=ev.target.closest(".tab");if(!b)return;
+    if(S.mode==="setup")readMeta();
+    S.mode=b.dataset.mode;render();
+  };
+}
+function readMeta(){
+  ["trainee","session","scenario","instructor","date"].forEach(k=>{
+    const el=document.getElementById("f-"+k);if(el)S.meta[k]=el.value.trim();
+  });
+}
+render();
+
+/* boot badge — house pattern: proves the running build survived load */
+try{var bb=document.createElement("div");bb.id="bootbadge";bb.textContent="JS OK · v0.2.1 · "+S.log.length+" ev";document.body.appendChild(bb);}catch(_){}
+
+/* offline install (only when served over http/https; the file still runs standalone from Files) */
+try{if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){navigator.serviceWorker.register("sw.js").catch(function(){});}}catch(_){}
+</script>
+</body>
+</html>
